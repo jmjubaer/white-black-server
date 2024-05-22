@@ -1,0 +1,20 @@
+# Ignore node_modules directory
+node_modules/
+
+# Ignore dotenv environment variable file
+.env
+
+# Ignore log files
+logs/
+*.log
+
+# Ignore build directory
+dist/
+build/
+
+# Ignore Vercel configuration files
+.vercel
+
+# Ignore other temporary files
+*.tmp
+*.temp
