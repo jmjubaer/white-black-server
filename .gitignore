@@ -15,6 +15,5 @@ build/
 # Ignore Vercel configuration files
 .vercel
 
-# Ignore other temporary files
-*.tmp
-*.temp
+
+vercel.json

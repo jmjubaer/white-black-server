@@ -30,6 +30,8 @@ async function run() {
         await client.connect();
 
         const allProduct = client.db("whiteAndBlack").collection("allProduct");
+        const orderProduct = client.db("whiteAndBlack").collection("oderProducts");
+        const customerAddress = client.db('whiteAndBlack').collection('customerAddress')
 
         // Get all products
         app.get('/collection/allProducts', async (req, res) => {
@@ -47,7 +49,7 @@ async function run() {
             try {
                 const id = req.params.id;
                 console.log(id)
-                const searchId = { _id: id };
+                const searchId = { _id: new ObjectId(id) };
                 console.log(searchId)
                 const response = await allProduct.findOne(searchId);
                 console.log(response)
@@ -59,17 +61,6 @@ async function run() {
             }
         });
 
-        // Add new products
-        app.post('/collection/addProducts', async (req, res) => {
-            try {
-                const data = req.body;
-                const response = await allProduct.insertOne(data);
-                res.send(response);
-            } catch (error) {
-                console.error('Error adding product:', error);
-                res.status(500).send({ error: 'An error occurred while adding the product' });
-            }
-        });
 
         // Get products by category
         app.get('/products/category', async (req, res) => {
@@ -87,6 +78,59 @@ async function run() {
                 res.status(500).send({ error: 'An error occurred while fetching products' });
             }
         });
+
+        app.get('/oder/product', async (req, res) => {
+            try {
+                const response = await orderProduct.find().toArray();
+                res.send(response);
+            } catch (error) {
+                res.status(500).send({ error: 'product cart data not found' });
+            }
+        });
+
+
+        // Add add too cart product
+        app.post('/product/add', async (req, res) => {
+            try {
+                const productData = req.body;
+                console.log(productData, '..............')
+                const response = await allProduct.insertOne(productData);
+                console.log(response)
+                res.send(response);
+            } catch (error) {
+                console.error('Error adding product add to card:', error);
+                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
+            }
+
+        })
+        // Add add too cart product
+        app.post('/api/order-address', async (req, res) => {
+            try {
+                const productData = req.body;
+                console.log(productData, '..............')
+                const response = await customerAddress.insertOne(productData);
+                console.log(response)
+                res.send(response);
+            } catch (error) {
+                console.error('Error adding product add to card:', error);
+                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
+            }
+
+        })
+
+        // Add new products
+        app.post('/collection/addProducts', async (req, res) => {
+            try {
+                const data = req.body;
+                const response = await allProduct.insertOne(data);
+                res.send(response);
+            } catch (error) {
+                console.error('Error adding product:', error);
+                res.status(500).send({ error: 'An error occurred while adding the product' });
+            }
+        });
+
+
 
         // Root route
         app.get("/", (req, res) => {
