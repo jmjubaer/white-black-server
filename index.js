@@ -46,6 +46,7 @@ async function run() {
 
         // Get product by ID
         app.get('/product/:id', async (req, res) => {
+
             try {
                 const id = req.params.id;
                 console.log(id)
@@ -91,10 +92,11 @@ async function run() {
 
         // Add add too cart product
         app.post('/product/add', async (req, res) => {
+            console.log('add is hiting ')
             try {
                 const productData = req.body;
                 console.log(productData, '..............')
-                const response = await allProduct.insertOne(productData);
+                const response = await orderProduct.insertOne(productData);
                 console.log(response)
                 res.send(response);
             } catch (error) {
@@ -104,19 +106,19 @@ async function run() {
 
         })
         // Add add too cart product
-        app.post('/api/order-address', async (req, res) => {
-            try {
-                const productData = req.body;
-                console.log(productData, '..............')
-                const response = await customerAddress.insertOne(productData);
-                console.log(response)
-                res.send(response);
-            } catch (error) {
-                console.error('Error adding product add to card:', error);
-                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
-            }
+        // app.post('/api/order-address', async (req, res) => {
+        //     try {
+        //         const productData = req.body;
+        //         console.log(productData, '..............')
+        //         const response = await customerAddress.insertOne(productData);
 
-        })
+        //         res.send(response);
+        //     } catch (error) {
+        //         console.error('Error adding product add to card:', error);
+        //         res.status(500).send({ error: 'An error occurred while adding the product add to card' });
+        //     }
+
+        // })
 
         // Add new products
         app.post('/collection/addProducts', async (req, res) => {
@@ -129,9 +131,42 @@ async function run() {
                 res.status(500).send({ error: 'An error occurred while adding the product' });
             }
         });
+        // confirm oder 
+        app.post('/api/confirmOrder', async (req, res) => {
+            console.log('hitting');
+            try {
+                const data = req.body;
+                console.log('Order Data:', data);
 
+                // Insert the order data into the customerAddress collection
+                const orderResponse = await customerAddress.insertOne(data);
 
+                // Ensure productId is an array and handle product deletions
+                if (Array.isArray(data.productId)) {
+                    let deleteCount = 0;
+                    for (const element of data.productId) {
+                        console.log('Deleting product with menuItemId:', element);
 
+                        const deleteResponse = await orderProduct.deleteMany({ menuItemId: element });
+                        console.log('Delete Response for menuItemId', element, ':', deleteResponse);
+
+                        if (deleteResponse.deletedCount > 0) {
+                            deleteCount += deleteResponse.deletedCount;
+                        }
+                    }
+
+                    res.send({
+                        orderResponse,
+                        message: `${deleteCount} products deleted`
+                    });
+                } else {
+                    res.status(400).send({ error: 'Invalid productId format' });
+                }
+            } catch (error) {
+                console.error('Error confirming order:', error);
+                res.status(500).send({ error: 'An error occurred while confirming the order' });
+            }
+        });
         // Root route
         app.get("/", (req, res) => {
             res.send("Welcome to the White And Black Server");
