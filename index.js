@@ -49,11 +49,11 @@ async function run() {
 
             try {
                 const id = req.params.id;
-                console.log(id)
+
                 const searchId = { _id: new ObjectId(id) };
-                console.log(searchId)
+
                 const response = await allProduct.findOne(searchId);
-                console.log(response)
+
                 res.send(response);
 
             } catch (error) {
@@ -65,6 +65,7 @@ async function run() {
 
         // Get products by category
         app.get('/products/category', async (req, res) => {
+
             try {
                 const category = req.query.category;
                 const validCategories = ['tshirt', 'polos', 'shirt', 'jackets', 'headware', 'bottomware', 'deals', 'accessories', 'new', 'deal'];
@@ -79,6 +80,23 @@ async function run() {
                 res.status(500).send({ error: 'An error occurred while fetching products' });
             }
         });
+        // status to get 
+        app.get('/products/status', async (req, res) => {
+            try {
+                const status = req?.query?.category;
+                const query = { status: status };
+                const response = await allProduct
+                    .find(query)
+                    .sort({ _id: -1 })
+                    .limit(8)
+                    .toArray();
+                res.send(response);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                res.status(500).send({ error: 'An error occurred while fetching products' });
+            }
+        });
+
 
         app.get('/oder/product', async (req, res) => {
             try {
@@ -89,15 +107,15 @@ async function run() {
             }
         });
 
-
+        // admin all route 
         // Add add too cart product
-        app.post('/product/add', async (req, res) => {
-            console.log('add is hiting ')
+        app.post('/admin/product/add', async (req, res) => {
+
             try {
                 const productData = req.body;
-                console.log(productData, '..............')
-                const response = await orderProduct.insertOne(productData);
-                console.log(response)
+
+                const response = await allProduct.insertOne(productData);
+
                 res.send(response);
             } catch (error) {
                 console.error('Error adding product add to card:', error);
@@ -105,20 +123,23 @@ async function run() {
             }
 
         })
+        // end admin all route
         // Add add too cart product
-        // app.post('/api/order-address', async (req, res) => {
-        //     try {
-        //         const productData = req.body;
-        //         console.log(productData, '..............')
-        //         const response = await customerAddress.insertOne(productData);
+        app.post('/product/add', async (req, res) => {
 
-        //         res.send(response);
-        //     } catch (error) {
-        //         console.error('Error adding product add to card:', error);
-        //         res.status(500).send({ error: 'An error occurred while adding the product add to card' });
-        //     }
+            try {
+                const productData = req.body;
 
-        // })
+                const response = await orderProduct.insertOne(productData);
+
+                res.send(response);
+            } catch (error) {
+
+                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
+            }
+
+
+        })
 
         // Add new products
         app.post('/collection/addProducts', async (req, res) => {
@@ -133,10 +154,10 @@ async function run() {
         });
         // confirm oder 
         app.post('/api/confirmOrder', async (req, res) => {
-            console.log('hitting');
+
             try {
                 const data = req.body;
-                console.log('Order Data:', data);
+
 
                 // Insert the order data into the customerAddress collection
                 const orderResponse = await customerAddress.insertOne(data);
@@ -145,10 +166,10 @@ async function run() {
                 if (Array.isArray(data.productId)) {
                     let deleteCount = 0;
                     for (const element of data.productId) {
-                        console.log('Deleting product with menuItemId:', element);
+
 
                         const deleteResponse = await orderProduct.deleteMany({ menuItemId: element });
-                        console.log('Delete Response for menuItemId', element, ':', deleteResponse);
+
 
                         if (deleteResponse.deletedCount > 0) {
                             deleteCount += deleteResponse.deletedCount;
@@ -176,11 +197,10 @@ async function run() {
             console.log(`Server is running on port ${port}`);
         });
 
-        // console.log("Successfully connected to MongoDB!");
+
 
     } finally {
-        // Optional: Uncomment this to close the client after run completes, usually not needed in long-running applications
-        // await client.close();
+
     }
 }
 
