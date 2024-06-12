@@ -31,7 +31,7 @@ async function run() {
 
         const allProduct = client.db("whiteAndBlack").collection("allProduct");
         const orderProduct = client.db("whiteAndBlack").collection("oderProducts");
-        const customerAddress = client.db('whiteAndBlack').collection('customerAddress')
+        const confirmOder = client.db('whiteAndBlack').collection('confirmOder')
 
         // Get all products
         app.get('/collection/allProducts', async (req, res) => {
@@ -153,36 +153,13 @@ async function run() {
             }
         });
         // confirm oder 
-        app.post('/api/confirmOrder', async (req, res) => {
-
+        app.put('/api/confirmOrder', async (req, res) => {
             try {
                 const data = req.body;
 
+                const orderResponse = await confirmOder.insertOne(data);
 
-                // Insert the order data into the customerAddress collection
-                const orderResponse = await customerAddress.insertOne(data);
-
-                // Ensure productId is an array and handle product deletions
-                if (Array.isArray(data.productId)) {
-                    let deleteCount = 0;
-                    for (const element of data.productId) {
-
-
-                        const deleteResponse = await orderProduct.deleteMany({ menuItemId: element });
-
-
-                        if (deleteResponse.deletedCount > 0) {
-                            deleteCount += deleteResponse.deletedCount;
-                        }
-                    }
-
-                    res.send({
-                        orderResponse,
-                        message: `${deleteCount} products deleted`
-                    });
-                } else {
-                    res.status(400).send({ error: 'Invalid productId format' });
-                }
+                res.status(200).send({ message: 'Order confirmed successfully', orderResponse });
             } catch (error) {
                 console.error('Error confirming order:', error);
                 res.status(500).send({ error: 'An error occurred while confirming the order' });
