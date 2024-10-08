@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { ObjectId } = require('mongodb');
+const { ObjectId } = require("mongodb");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const dotenv = require("dotenv");
 
@@ -12,7 +12,8 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const uri = `mongodb+srv://${process.env.USER_DB}:${process.env.USER_PAS}@cluster0.p45io4t.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+// const uri = `mongodb+srv://${process.env.USER_DB}:${process.env.USER_PAS}@cluster0.p45io4t.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.USER_DB}:${process.env.USER_PAS}@cluster0.ddyy7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const client = new MongoClient(uri, {
     serverApi: {
@@ -28,141 +29,531 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         await client.connect();
+        //collections ====
+        const products = client.db("White-black").collection("Products");
+        const order = client.db("White-black").collection("Order");
+        const posts = client.db("White-black").collection("Posts");
+        const link = client.db("White-black").collection("Link");
+        const TopMovingText = client
+            .db("White-black")
+            .collection("TopMovingText");
+        const BannerMovingText = client
+            .db("White-black")
+            .collection("BannerMovingText");
+        const SecondBannerMovingText = client
+            .db("White-black")
+            .collection("SecondBannerMovingText");
 
-        const allProduct = client.db("whiteAndBlack").collection("allProduct");
-        const orderProduct = client.db("whiteAndBlack").collection("oderProducts");
-        const confirmOder = client.db('whiteAndBlack').collection('confirmOder')
-
-        // Get all products
-        app.get('/collection/allProducts', async (req, res) => {
+        // Product related api start ==========================================
+        // Get products
+        app.get("/products/:category", async (req, res) => {
             try {
-                const response = await allProduct.find().toArray();
+                const category = req.params.category;
+                const minPrice = parseFloat(req.query.minPrice) || 0; // Default to 0 if not provided
+                const maxPrice = parseFloat(req.query.maxPrice) || Infinity; // Default to Infinity if not provided
+
+                // Base query with price range filtering for string-based prices
+                let query = {
+                    $expr: {
+                        $and: [
+                            { $gte: [{ $toDouble: "$price" }, minPrice] },
+                            { $lte: [{ $toDouble: "$price" }, maxPrice] },
+                        ],
+                    },
+                };
+
+                // Add category filter if it's not "all"
+                if (category === "deals") {
+                    // Filter by deals: true
+                    query.deals = true;
+                } else if (category === "regular-fit") {
+                    // Filter by fit: "regular-fit"
+                    query.fit = "regular-fit";
+                } else if (category === "slim-fit") {
+                    // Filter by fit: "slim-fit"
+                    query.fit = "slim-fit";
+                } else if (category !== "all") {
+                    // Filter by category (other than "all")
+                    query.category = category;
+                }
+
+                // Fetch products based on the combined query
+                const response = await products.find(query).toArray();
                 res.send(response);
             } catch (error) {
-                console.error('Error fetching all products:', error);
-                res.status(500).send({ error: 'An error occurred while fetching products' });
+                console.error("Error fetching products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching products",
+                });
+            }
+        });
+
+        app.get("/products/:category/prices-and-stock", async (req, res) => {
+            try {
+                const category = req.params.category;
+
+                // Base query with only category filtering
+                let query = {};
+                if (category !== "all") {
+                    query.category = category;
+                }
+
+                // Fetch only the price and status fields for the filtered products
+                const productsData = await products
+                    .find(query, { projection: { price: 1, status: 1 } })
+                    .toArray();
+
+                // If no products are found, return default values
+                if (productsData.length === 0) {
+                    return res.send({
+                        lowestPrice: 0,
+                        highestPrice: 0,
+                        inStockCount: 0,
+                        outOfStockCount: 0,
+                    });
+                }
+
+                // Convert string prices to numbers and extract stock status
+                const numericPrices = productsData.map((product) =>
+                    parseFloat(product.price)
+                );
+                const stockStatus = productsData.map(
+                    (product) => product.status
+                );
+
+                // Get the lowest and highest prices
+                const lowestPrice = Math.min(...numericPrices);
+                const highestPrice = Math.max(...numericPrices);
+
+                // Count how many products are in stock and out of stock
+                const inStockCount = stockStatus.filter(
+                    (status) => status === "in-stock"
+                ).length;
+                const outOfStockCount = stockStatus.filter(
+                    (status) => status === "sold-out"
+                ).length;
+
+                // Send the result
+                res.send({
+                    lowestPrice,
+                    highestPrice,
+                    inStockCount,
+                    outOfStockCount,
+                });
+            } catch (error) {
+                console.error("Error fetching prices and stock:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching prices and stock",
+                });
+            }
+        });
+
+        //get mew lanced products
+        app.get("/product/newlaunched", async (req, res) => {
+            try {
+                const response = await products
+                    .find()
+                    .sort({ timeStamp: -1 })
+                    .limit(10)
+                    .toArray();
+
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching new launched products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching new launched products",
+                });
             }
         });
 
         // Get product by ID
-        app.get('/product/:id', async (req, res) => {
-
+        app.get("/product/:id", async (req, res) => {
             try {
                 const id = req.params.id;
 
+                // Check if the id is valid ObjectId
+                if (!ObjectId.isValid(id)) {
+                    return res
+                        .status(400)
+                        .send({ error: "Invalid product ID" });
+                }
+
                 const searchId = { _id: new ObjectId(id) };
 
-                const response = await allProduct.findOne(searchId);
+                // Fetch the product with the given ID
+                const response = await products.findOne(searchId);
 
-                res.send(response);
+                // If no product found, return an empty object
+                if (!response) {
+                    return res.status(200).send({});
+                }
 
+                // Send the product if found
+                res.status(200).send(response);
             } catch (error) {
-                console.error('Internal Server Error:', error);
+                console.error("Internal Server Error:", error);
                 res.status(500).send("Internal Server Error");
             }
         });
 
-
-        // Get products by category
-        app.get('/products/category', async (req, res) => {
-
+        app.get("/product/home/accessories", async (req, res) => {
             try {
-                const category = req.query.category;
-                const validCategories = ['tshirt', 'polos', 'shirt', 'jackets', 'headware', 'bottomware', 'deals', 'accessories', 'new', 'deal'];
-                if (!validCategories.includes(category)) {
-                    return res.status(400).send({ error: 'Invalid category' });
-                }
-                const query = { category: category };
-                const response = await allProduct.find(query).toArray();
+                const response = await products
+                    .find({ category: "accessories" })
+                    .sort({ timeStamp: -1 })
+                    .limit(12)
+                    .toArray();
+
                 res.send(response);
             } catch (error) {
-                console.error('Error fetching products:', error);
-                res.status(500).send({ error: 'An error occurred while fetching products' });
+                console.error("Error fetching new launched products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching new launched products",
+                });
             }
         });
-        // status to get 
-        app.get('/products/status', async (req, res) => {
+
+        // Product related api end ==========================================
+
+        // order related api start =====================================================
+
+        // Place oder
+        app.post("/api/confirmOrder", async (req, res) => {
+            try {
+                const data = req.body;
+
+                const orderResponse = await order.insertOne(data);
+
+                res.status(200).send({
+                    message: "Order confirmed successfully",
+                    orderResponse,
+                });
+            } catch (error) {
+                console.error("Error confirming order:", error);
+                res.status(500).send({
+                    error: "An error occurred while confirming the order",
+                });
+            }
+        });
+        //Get all orders
+        app.get("/oder/product", async (req, res) => {
+            try {
+                const response = await order.find().toArray();
+                res.send(response);
+            } catch (error) {
+                res.status(500).send({ error: "product cart data not found" });
+            }
+        });
+        // order related api end =====================================================
+
+        // Moving text related api start =====================================================
+
+        // top moving text ===========
+        app.put("/top-moving-text/:id", async (req, res) => {
+            try {
+                const text = req.body.text;
+                const updatedDoc = {
+                    $set: {
+                        text: text,
+                    },
+                };
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const option = { upsert: true };
+                const response = await TopMovingText.updateOne(
+                    query,
+                    updatedDoc,
+                    option
+                );
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        app.get("/top-moving-text", async (req, res) => {
+            try {
+                const response = await TopMovingText.findOne();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        // Banner moving text ===========
+        app.put("/banner-moving-text/:id", async (req, res) => {
+            try {
+                const text = req.body.text;
+                const updatedDoc = {
+                    $set: {
+                        text: text,
+                    },
+                };
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const option = { upsert: true };
+                const response = await BannerMovingText.updateOne(
+                    query,
+                    updatedDoc,
+                    option
+                );
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        app.get("/banner-moving-text", async (req, res) => {
+            try {
+                const response = await BannerMovingText.findOne();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+        // Second banner moving text ===========
+        app.put("/second-banner-moving-text/:id", async (req, res) => {
+            try {
+                const text = req.body.text;
+                const updatedDoc = {
+                    $set: {
+                        text: text,
+                    },
+                };
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const option = { upsert: true };
+                const response = await SecondBannerMovingText.updateOne(
+                    query,
+                    updatedDoc,
+                    option
+                );
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        app.get("/second-banner-moving-text", async (req, res) => {
+            try {
+                const response = await SecondBannerMovingText.findOne();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        // Moving text related api end =====================================================
+
+        // Post related api start =====================================================
+        app.get("/post", async (req, res) => {
+            try {
+                const response = await posts.findOne();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+        //Post related api end =====================================================
+        app.get("/highlight-product-link", async (req, res) => {
+            try {
+                const response = await link.findOne();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+
+        app.put("/highlight-product-link/:id", async (req, res) => {
+            try {
+                const linkData = req.body.link;
+                const updatedDoc = {
+                    $set: {
+                        link: linkData,
+                    },
+                };
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) };
+                const option = { upsert: true };
+                const response = await link.updateOne(
+                    query,
+                    updatedDoc,
+                    option
+                );
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching data", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching data",
+                });
+            }
+        });
+        // Add product
+        app.post("/product/addproducts", async (req, res) => {
+            try {
+                const data = req.body;
+                const response = await products.insertOne(data);
+                res.send(response);
+            } catch (error) {
+                console.error("Error adding product:", error);
+                res.status(500).send({
+                    error: "An error occurred while adding the product",
+                });
+            }
+        });
+        // Get products by category
+        app.get("/products/category", async (req, res) => {
+            try {
+                const category = req.query.category;
+                const validCategories = [
+                    "tshirt",
+                    "polos",
+                    "shirt",
+                    "jackets",
+                    "headware",
+                    "bottomware",
+                    "deals",
+                    "accessories",
+                    "new",
+                    "deal",
+                ];
+                if (!validCategories.includes(category)) {
+                    return res.status(400).send({ error: "Invalid category" });
+                }
+                const query = { category: category };
+                const response = await products.find(query).toArray();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching products",
+                });
+            }
+        });
+        // status to get
+        app.get("/products/status", async (req, res) => {
             try {
                 const status = req?.query?.category;
                 const query = { status: status };
-                const response = await allProduct
+                const response = await products
                     .find(query)
                     .sort({ _id: -1 })
                     .limit(8)
                     .toArray();
                 res.send(response);
             } catch (error) {
-                console.error('Error fetching products:', error);
-                res.status(500).send({ error: 'An error occurred while fetching products' });
+                console.error("Error fetching products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching products",
+                });
             }
         });
 
-
-        app.get('/oder/product', async (req, res) => {
-            try {
-                const response = await orderProduct.find().toArray();
-                res.send(response);
-            } catch (error) {
-                res.status(500).send({ error: 'product cart data not found' });
-            }
-        });
-
-        // admin all route 
+        // admin all route
         // Add add too cart product
-        app.post('/admin/product/add', async (req, res) => {
-
+        app.post("/admin/product/add", async (req, res) => {
             try {
                 const productData = req.body;
 
-                const response = await allProduct.insertOne(productData);
+                const response = await products.insertOne(productData);
 
                 res.send(response);
             } catch (error) {
-                console.error('Error adding product add to card:', error);
-                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
+                console.error("Error adding product add to card:", error);
+                res.status(500).send({
+                    error: "An error occurred while adding the product add to card",
+                });
             }
-
-        })
+        });
         // end admin all route
         // Add add too cart product
-        app.post('/product/add', async (req, res) => {
-
-            try {
-                const productData = req.body;
-
-                const response = await orderProduct.insertOne(productData);
-
-                res.send(response);
-            } catch (error) {
-
-                res.status(500).send({ error: 'An error occurred while adding the product add to card' });
-            }
-
-
-        })
 
         // Add new products
-        app.post('/collection/addProducts', async (req, res) => {
+        app.post("/collection/addProducts", async (req, res) => {
             try {
                 const data = req.body;
-                const response = await allProduct.insertOne(data);
+                const response = await products.insertOne(data);
                 res.send(response);
             } catch (error) {
-                console.error('Error adding product:', error);
-                res.status(500).send({ error: 'An error occurred while adding the product' });
+                console.error("Error adding product:", error);
+                res.status(500).send({
+                    error: "An error occurred while adding the product",
+                });
             }
         });
-        // confirm oder 
-        app.put('/api/confirmOrder', async (req, res) => {
+
+        // Get search products
+        app.get("/products/search/:searchtext", async (req, res) => {
             try {
-                const data = req.body;
-
-                const orderResponse = await confirmOder.insertOne(data);
-
-                res.status(200).send({ message: 'Order confirmed successfully', orderResponse });
+                const searchtext = req.params.searchtext;
+                const query = {
+                    title: {
+                        $regex: searchtext,
+                        $options: "i", // 'i' for case-insensitive search
+                    },
+                };
+                const response = await products.find(query).toArray();
+                res.send(response);
             } catch (error) {
-                console.error('Error confirming order:', error);
-                res.status(500).send({ error: 'An error occurred while confirming the order' });
+                console.error("Error fetching all products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching products",
+                });
+            }
+        });
+
+        // API route to get products by array of IDs
+        app.post("/get-cart-products", async (req, res) => {
+            try {
+                // Get the array of product IDs from the request body
+                const productIds = req.body.productIds;
+
+                // Check if productIds is an array and contains valid ObjectId strings
+                if (!Array.isArray(productIds) || productIds.length === 0) {
+                    return res
+                        .status(400)
+                        .json({ error: "Product IDs array is required" });
+                }
+
+                // Convert the string IDs to ObjectId instances for MongoDB
+                const objectIdArray = productIds.map((id) => new ObjectId(id));
+
+                // Query the database to fetch products with the matching IDs
+                const result = await products
+                    .find({ _id: { $in: objectIdArray } })
+                    .toArray();
+
+                // Send the matching products as the response
+                res.status(200).json(result);
+            } catch (error) {
+                console.error("Error fetching products:", error);
+                res.status(500).json({
+                    error: "An error occurred while fetching products",
+                });
             }
         });
         // Root route
@@ -173,11 +564,7 @@ async function run() {
         app.listen(port, () => {
             console.log(`Server is running on port ${port}`);
         });
-
-
-
     } finally {
-
     }
 }
 
