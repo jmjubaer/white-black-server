@@ -34,6 +34,7 @@ async function run() {
         const order = client.db("White-black").collection("Order");
         const posts = client.db("White-black").collection("Posts");
         const link = client.db("White-black").collection("Link");
+        const contactUs = client.db("White-black").collection("ContactUs");
         const TopMovingText = client
             .db("White-black")
             .collection("TopMovingText");
@@ -213,6 +214,19 @@ async function run() {
             }
         });
 
+        // Add product
+        app.post("/product/addproducts", async (req, res) => {
+            try {
+                const data = req.body;
+                const response = await products.insertOne(data);
+                res.send(response);
+            } catch (error) {
+                console.error("Error adding product:", error);
+                res.status(500).send({
+                    error: "An error occurred while adding the product",
+                });
+            }
+        });
         // Product related api end ==========================================
 
         // order related api start =====================================================
@@ -375,7 +389,10 @@ async function run() {
                 });
             }
         });
+
         //Post related api end =====================================================
+
+        //highlight related api start =====================================================
         app.get("/highlight-product-link", async (req, res) => {
             try {
                 const response = await link.findOne();
@@ -412,11 +429,28 @@ async function run() {
                 });
             }
         });
-        // Add product
-        app.post("/product/addproducts", async (req, res) => {
+
+        //highlight related api end =====================================================
+
+        //Contact us related api start =====================================================
+
+        app.get("/contact-us", async (req, res) => {
+            try {
+                const response = await contactUs.find().toArray();
+
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching new launched products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching new launched products",
+                });
+            }
+        });
+
+        app.post("/contact-us", async (req, res) => {
             try {
                 const data = req.body;
-                const response = await products.insertOne(data);
+                const response = await contactUs.insertOne(data);
                 res.send(response);
             } catch (error) {
                 console.error("Error adding product:", error);
@@ -425,6 +459,31 @@ async function run() {
                 });
             }
         });
+        
+        app.delete("/contact-us/:id", async (req, res) => {
+            const { id } = req.params; // Get the ID from the request parameters
+        
+            try {
+                // Ensure the ID is valid before querying the database
+                const result = await contactUs.deleteOne({ _id: new ObjectId(id) });
+        
+                if (result.deletedCount === 0) {
+                    // No document was found with that ID
+                    res.status(404).send({ error: "Contact not found" });
+                } else {
+                    // Document was successfully deleted
+                    res.send({ message: "Contact deleted successfully" });
+                }
+            } catch (error) {
+                console.error("Error deleting contact:", error);
+                res.status(500).send({
+                    error: "An error occurred while deleting the contact",
+                });
+            }
+        });
+        
+        //Contact us related api start =====================================================
+
         // Get products by category
         app.get("/products/category", async (req, res) => {
             try {
@@ -565,6 +624,7 @@ async function run() {
             console.log(`Server is running on port ${port}`);
         });
     } finally {
+
     }
 }
 
