@@ -227,6 +227,81 @@ async function run() {
                 });
             }
         });
+        //update products -api
+        app.put("/product/update/:id", async (req, res) => {
+            const { id } = req.params; // Get the product ID from the URL
+            const updatedData = req.body; // Get the updated data from the request body
+
+            try {
+                // Update the product using its ID
+                const result = await products.updateOne(
+                    { _id: new ObjectId(id) }, // Match the product by its ID
+                    { $set: updatedData } // Set the updated fields
+                );
+
+                if (result.matchedCount === 0) {
+                    // No product was found with that ID
+                    res.status(404).send({ error: "Product not found" });
+                } else {
+                    // Product was successfully updated
+                    res.send({
+                        message: "Product updated successfully",
+                        result,
+                    });
+                }
+            } catch (error) {
+                console.error("Error updating product:", error);
+                res.status(500).send({
+                    error: "An error occurred while updating the product",
+                });
+            }
+        });
+
+        // Product deletion api
+        app.delete("/product/delete/:id", async (req, res) => {
+            const { id } = req.params; // Get the ID from the request parameters
+
+            try {
+                // Ensure the ID is valid before querying the database
+                const result = await products.deleteOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (result.deletedCount === 0) {
+                    // No product was found with that ID
+                    res.status(404).send({ error: "Product not found" });
+                } else {
+                    // Product was successfully deleted
+                    res.send({ message: "Product deleted successfully" });
+                }
+            } catch (error) {
+                console.error("Error deleting product:", error);
+                res.status(500).send({
+                    error: "An error occurred while deleting the product",
+                });
+            }
+        });
+
+        // Get search products
+        app.get("/products/search/:searchtext", async (req, res) => {
+            try {
+                const searchtext = req.params.searchtext;
+                const query = {
+                    title: {
+                        $regex: searchtext,
+                        $options: "i", // 'i' for case-insensitive search
+                    },
+                };
+                const response = await products.find(query).toArray();
+                res.send(response);
+            } catch (error) {
+                console.error("Error fetching all products:", error);
+                res.status(500).send({
+                    error: "An error occurred while fetching products",
+                });
+            }
+        });
+
         // Product related api end ==========================================
 
         // order related api start =====================================================
@@ -250,7 +325,7 @@ async function run() {
             }
         });
         //Get all orders
-        app.get("/oder/product", async (req, res) => {
+        app.get("/order", async (req, res) => {
             try {
                 const response = await order.find().toArray();
                 res.send(response);
@@ -258,6 +333,65 @@ async function run() {
                 res.status(500).send({ error: "product cart data not found" });
             }
         });
+        //single order api
+        app.get("/order/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+
+                // Check if the id is valid ObjectId
+                if (!ObjectId.isValid(id)) {
+                    return res
+                        .status(400)
+                        .send({ error: "Invalid product ID" });
+                }
+
+                const orderId = { _id: new ObjectId(id) };
+
+                // Fetch the product with the given ID
+                const response = await order.findOne(orderId);
+
+                // If no product found, return an empty object
+                if (!response) {
+                    return res.status(200).send({});
+                }
+
+                // Send the product if found
+                res.status(200).send(response);
+            } catch (error) {
+                console.error("Internal Server Error:", error);
+                res.status(500).send("Internal Server Error");
+            }
+        });
+        // status update api response
+        app.put("/order/status/:id", async (req, res) => {
+            const orderId = req.params.id; // Get the order ID from the request params
+            const { status } = req.body; // Get the new status from the request body
+
+            try {
+                // Assuming orderId is an ObjectId, convert it to ObjectId type
+                const { ObjectId } = require("mongodb");
+
+                // Find the order by ID and update its status
+                const updateResult = await order.updateOne(
+                    { _id: new ObjectId(orderId) }, // Find the order by ID
+                    { $set: { status: status } } // Set the new status
+                );
+
+                // Check if the order was successfully updated
+                if (updateResult.modifiedCount === 1) {
+                    res.send({ message: "Order status updated successfully" });
+                } else {
+                    res.status(404).send({
+                        error: "Order not found or no changes made",
+                    });
+                }
+            } catch (error) {
+                res.status(500).send({
+                    error: "Failed to update order status",
+                });
+            }
+        });
+
         // order related api end =====================================================
 
         // Moving text related api start =====================================================
@@ -459,14 +593,16 @@ async function run() {
                 });
             }
         });
-        
+
         app.delete("/contact-us/:id", async (req, res) => {
             const { id } = req.params; // Get the ID from the request parameters
-        
+
             try {
                 // Ensure the ID is valid before querying the database
-                const result = await contactUs.deleteOne({ _id: new ObjectId(id) });
-        
+                const result = await contactUs.deleteOne({
+                    _id: new ObjectId(id),
+                });
+
                 if (result.deletedCount === 0) {
                     // No document was found with that ID
                     res.status(404).send({ error: "Contact not found" });
@@ -481,7 +617,7 @@ async function run() {
                 });
             }
         });
-        
+
         //Contact us related api start =====================================================
 
         // Get products by category
@@ -565,26 +701,6 @@ async function run() {
             }
         });
 
-        // Get search products
-        app.get("/products/search/:searchtext", async (req, res) => {
-            try {
-                const searchtext = req.params.searchtext;
-                const query = {
-                    title: {
-                        $regex: searchtext,
-                        $options: "i", // 'i' for case-insensitive search
-                    },
-                };
-                const response = await products.find(query).toArray();
-                res.send(response);
-            } catch (error) {
-                console.error("Error fetching all products:", error);
-                res.status(500).send({
-                    error: "An error occurred while fetching products",
-                });
-            }
-        });
-
         // API route to get products by array of IDs
         app.post("/get-cart-products", async (req, res) => {
             try {
@@ -615,6 +731,7 @@ async function run() {
                 });
             }
         });
+
         // Root route
         app.get("/", (req, res) => {
             res.send("Welcome to the White And Black Server");
@@ -624,7 +741,6 @@ async function run() {
             console.log(`Server is running on port ${port}`);
         });
     } finally {
-
     }
 }
 
