@@ -514,12 +514,59 @@ async function run() {
         // Post related api start =====================================================
         app.get("/post", async (req, res) => {
             try {
-                const response = await posts.findOne();
+                const response = await posts.find().toArray();
                 res.send(response);
             } catch (error) {
                 console.error("Error fetching data", error);
                 res.status(500).send({
                     error: "An error occurred while fetching data",
+                });
+            }
+        });
+        app.get("/post/:id", async (req, res) => {
+            const postId = req.params.id; // Get the updated data from the request body
+
+            try {
+                // Update the post based on the provided data
+                const result = await posts.findOne({
+                    _id: new ObjectId(postId),
+                });
+
+                // Check if the post was successfully updated
+               res.send(result)
+            } catch (error) {
+                console.error("Error updating post", error);
+                res.status(500).send({
+                    error: "An error occurred while updating the post",
+                });
+            }
+        });
+        app.put("/post/:id", async (req, res) => {
+            const postId = req.params.id; // Get the post ID from the request params
+            const updatedData = req.body; // Get the updated data from the request body
+
+            try {
+                // Assuming postId is an ObjectId, convert it to ObjectId type
+                const { ObjectId } = require("mongodb");
+
+                // Update the post based on the provided data
+                const updateResult = await posts.updateOne(
+                    { _id: new ObjectId(postId) }, // Find the post by its ID
+                    { $set: updatedData } // Set the new values from request body
+                );
+
+                // Check if the post was successfully updated
+                if (updateResult.modifiedCount === 1) {
+                    res.send({ message: "Post updated successfully" });
+                } else {
+                    res.status(404).send({
+                        error: "Post not found or no changes made",
+                    });
+                }
+            } catch (error) {
+                console.error("Error updating post", error);
+                res.status(500).send({
+                    error: "An error occurred while updating the post",
                 });
             }
         });
@@ -620,6 +667,9 @@ async function run() {
 
         //Contact us related api start =====================================================
 
+
+
+        
         // Get products by category
         app.get("/products/category", async (req, res) => {
             try {
